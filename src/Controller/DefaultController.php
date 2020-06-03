@@ -1,11 +1,18 @@
 <?php
     
 namespace App\Controller;
-    
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+
+use App\Entity\Produit;
+use App\Repository\ProduitRepository;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-    
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Serializer\Exception\NotEncodableValueException;
+use Symfony\Component\Serializer\SerializerInterface;
+
 class DefaultController extends AbstractController
 {
     /**
@@ -18,7 +25,6 @@ class DefaultController extends AbstractController
 
     /**
      * @Route("/api/users", name="users")
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
      */
     public function getUsers()
     {
@@ -55,33 +61,37 @@ class DefaultController extends AbstractController
             ]
         ];
     
-        $response = new Response();
-
-        $response->headers->set('Content-Type', 'application/json');
-        $response->headers->set('Access-Control-Allow-Origin', '*');
-
-        $response->setContent(json_encode($users));
-        
-        return $response;
+        return new JsonResponse($users);
     }
 
     /**
-     * @Route("/api/produits", name="produits")
-     * @return \Symfony\Component\HttpFoundation\JsonResponse
-     */
-    public function getProduits()
+    * @Route("/api/produits", name="produits",methods={"GET"})
+    */
+    public function getProduits(ProduitRepository $repoProduit)
     {
-        $produits = [
-           
-        ];
-    
-        $response = new Response();
 
-        $response->headers->set('Content-Type', 'application/json');
-        $response->headers->set('Access-Control-Allow-Origin', '*');
-
-        $response->setContent(json_encode($produits));
-        
+        $produits=$repoProduit->findAll();
+        $response = $this->json($produits,200,[],['groups'=>'produit:read']);
         return $response;
     }
+    /**
+    * @Route("/api/addProduits", name="addProduits",methods={"POST"})
+    */
+    public function addProduits(Request $request,SerializerInterface $serializer)
+    {
+        try{
+            $jsonRecu=$request->getContent();
+            $produit= $serializer->deserialize($jsonRecu,Produit::class,'json');
+            $em=$this->getDoctrine()->getManager();
+            $em->persist($produit);
+            $em->flush();
+            return $this->json($produit,201,['groups'=>'produit:read']);
+         }catch(NotEncodableValueException $e){
+             return $this->json([
+                'status'=>400,
+                'message'=>$e->getMessage()
+             ]);
+         }
+
+        }
 }
